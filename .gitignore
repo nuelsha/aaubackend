@@ -1,0 +1,11 @@
+client/node_modules/
+server/node_modules/
+node_modules/
+
+.env
+client/.env
+server/.env
+.env.local
+.env.production
+.env.development
+.env.test

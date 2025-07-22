@@ -1,0 +1,1004 @@
+swagger: '2.0'
+info:
+  title: Partnership Management API
+  description: API for managing university partnerships and user authentication
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@partnerships.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+host: localhost:7004
+basePath: /api
+schemes:
+  - http
+  - https
+consumes:
+  - application/json
+produces:
+  - application/json
+securityDefinitions:
+  jwt:
+    type: apiKey
+    name: jwt
+    in: cookie
+    description: JWT token for authentication
+
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user and return JWT token
+      parameters:
+        - in: body
+          name: credentials
+          description: User credentials
+          required: true
+          schema:
+            type: object
+            required:
+              - email
+              - password
+            properties:
+              email:
+                type: string
+                format: email
+                example: admin@example.com
+              password:
+                type: string
+                example: password123
+      responses:
+        200:
+          description: Successful login
+          schema:
+            type: object
+            properties:
+              _id:
+                type: string
+              firstName:
+                type: string
+              lastName:
+                type: string
+              email:
+                type: string
+              role:
+                type: string
+                enum: ['SuperAdmin', 'Admin']
+              campusId:
+                type: string
+              status:
+                type: string
+                enum: ['pending', 'active', 'inactive']
+        400:
+          description: Invalid credentials
+        500:
+          description: Server error
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: User logout
+      description: Clear JWT cookie
+      responses:
+        200:
+          description: Successfully logged out
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Logged out successfully
+        500:
+          description: Server error
+
+  /auth/reset-password:
+    post:
+      tags:
+        - Authentication
+      summary: Reset user password
+      description: Reset password for authenticated user
+      security:
+        - jwt: []
+      parameters:
+        - in: body
+          name: passwords
+          description: New password details
+          required: true
+          schema:
+            type: object
+            required:
+              - email
+              - newPassword
+              - confirmPassword
+            properties:
+              email:
+                type: string
+                format: email
+              newPassword:
+                type: string
+                minLength: 8
+                maxLength: 12
+              confirmPassword:
+                type: string
+                minLength: 8
+                maxLength: 12
+      responses:
+        200:
+          description: Password reset successful
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Password reset successfully
+        400:
+          description: Invalid input or passwords don't match
+        403:
+          description: Forbidden - can only reset own password
+        500:
+          description: Server error
+
+  /partnership:
+    post:
+      tags:
+        - Partnerships
+      summary: Create a new partnership
+      description: Create a new partnership record
+      security:
+        - jwt: []
+      parameters:
+        - in: body
+          name: partnership
+          description: Partnership details
+          required: true
+          schema:
+            $ref: '#/definitions/Partnership'
+      responses:
+        201:
+          description: Partnership created successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+              partnership:
+                $ref: '#/definitions/Partnership'
+        400:
+          description: Validation error
+        403:
+          description: Forbidden - user not active
+        500:
+          description: Server error
+
+    get:
+      tags:
+        - Partnerships
+      summary: Get filtered partnerships
+      description: Retrieve partnerships with optional filtering and pagination
+      security:
+        - jwt: []
+      parameters:
+        - in: query
+          name: status
+          type: string
+          enum: ['Pending', 'Active', 'Rejected']
+        - in: query
+          name: typeOfOrganization
+          type: string
+          enum: ['Academic', 'Research', 'NGO', 'INGO', 'Government', 'Private', 'Other']
+        - in: query
+          name: potentialStartDate
+          type: string
+          format: date
+        - in: query
+          name: durationOfPartnership
+          type: string
+          enum: ['1 year', '2 years', '3 years', '4 years', '5 years']
+        - in: query
+          name: archived
+          type: boolean
+        - in: query
+          name: limit
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+        - in: query
+          name: page
+          type: integer
+          minimum: 1
+          default: 1
+      responses:
+        200:
+          description: List of partnerships
+          schema:
+            type: object
+            properties:
+              partnerships:
+                type: array
+                items:
+                  $ref: '#/definitions/Partnership'
+              pagination:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  pages:
+                    type: integer
+                  limit:
+                    type: integer
+        400:
+          description: Invalid query parameters
+        500:
+          description: Server error
+
+  /partnership/export:
+    get:
+      tags:
+        - Partnerships
+      summary: Export partnerships
+      description: Export all partnerships (filtered by campus for non-SuperAdmins)
+      security:
+        - jwt: []
+      responses:
+        200:
+          description: List of all partnerships
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Partnership'
+        500:
+          description: Server error
+
+  /partnership/{id}:
+    get:
+      tags:
+        - Partnerships
+      summary: Get partnership by ID
+      description: Retrieve a specific partnership by its ID
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: id
+          type: string
+          required: true
+          description: MongoDB ObjectId
+      responses:
+        200:
+          description: Partnership details
+          schema:
+            $ref: '#/definitions/Partnership'
+        404:
+          description: Partnership not found
+        500:
+          description: Server error
+
+    put:
+      tags:
+        - Partnerships
+      summary: Update partnership
+      description: Update an existing partnership
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: id
+          type: string
+          required: true
+          description: MongoDB ObjectId
+        - in: body
+          name: partnership
+          description: Updated partnership details
+          required: true
+          schema:
+            $ref: '#/definitions/Partnership'
+      responses:
+        200:
+          description: Partnership updated successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+              updatedPartnership:
+                $ref: '#/definitions/Partnership'
+        404:
+          description: Partnership not found
+        500:
+          description: Server error
+
+    delete:
+      tags:
+        - Partnerships
+      summary: Delete partnership
+      description: Delete a partnership by ID
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: id
+          type: string
+          required: true
+          description: MongoDB ObjectId
+      responses:
+        200:
+          description: Partnership deleted successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+        404:
+          description: Partnership not found
+        500:
+          description: Server error
+
+  /partnership/{id}/renew:
+    patch:
+      tags:
+        - Partnerships
+      summary: Renew partnership
+      description: Renew an existing partnership with new dates
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: id
+          type: string
+          required: true
+          description: MongoDB ObjectId
+        - in: body
+          name: renewal
+          description: Renewal details
+          required: true
+          schema:
+            type: object
+            required:
+              - potentialStartDate
+              - durationOfPartnership
+            properties:
+              potentialStartDate:
+                type: string
+                format: date
+              durationOfPartnership:
+                type: string
+                enum: ['1 year', '2 years', '3 years', '4 years', '5 years']
+      responses:
+        200:
+          description: Partnership renewed successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+              updatedPartnership:
+                $ref: '#/definitions/Partnership'
+        404:
+          description: Partnership not found
+        500:
+          description: Server error
+
+  /partnership/{id}/approve:
+    patch:
+      tags:
+        - Partnerships
+      summary: Approve partnership
+      description: Approve a pending partnership (Admin/SuperAdmin only)
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: id
+          type: string
+          required: true
+          description: MongoDB ObjectId
+      responses:
+        200:
+          description: Partnership approved
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+              partnership:
+                $ref: '#/definitions/Partnership'
+        400:
+          description: Only pending partnerships can be approved
+        403:
+          description: Forbidden - insufficient permissions
+        404:
+          description: Partnership not found
+        500:
+          description: Server error
+
+  /partnership/{id}/reject:
+    patch:
+      tags:
+        - Partnerships
+      summary: Reject partnership
+      description: Reject a pending partnership (Admin/SuperAdmin only)
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: id
+          type: string
+          required: true
+          description: MongoDB ObjectId
+      responses:
+        200:
+          description: Partnership rejected
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+              partnership:
+                $ref: '#/definitions/Partnership'
+        400:
+          description: Only pending partnerships can be rejected
+        403:
+          description: Forbidden - insufficient permissions
+        404:
+          description: Partnership not found
+        500:
+          description: Server error
+
+  /partnership/{id}/archive:
+    patch:
+      tags:
+        - Partnerships
+      summary: Archive partnership
+      description: Archive an active partnership
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: id
+          type: string
+          required: true
+          description: MongoDB ObjectId
+      responses:
+        200:
+          description: Partnership archived
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+              partnership:
+                $ref: '#/definitions/Partnership'
+        400:
+          description: Partnership is already archived
+        404:
+          description: Partnership not found
+        500:
+          description: Server error
+
+  /superadmin/assign-admin:
+    post:
+      tags:
+        - SuperAdmin
+      summary: Assign new admin
+      description: Create a new admin user (SuperAdmin only)
+      security:
+        - jwt: []
+      parameters:
+        - in: body
+          name: admin
+          description: Admin details
+          required: true
+          schema:
+            type: object
+            required:
+              - email
+              - firstName
+              - lastName
+              - campusId
+            properties:
+              email:
+                type: string
+                format: email
+              firstName:
+                type: string
+              lastName:
+                type: string
+              campusId:
+                type: string
+      responses:
+        200:
+          description: Admin created successfully
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+              email:
+                type: string
+              generatedPassword:
+                type: string
+        400:
+          description: Email already registered
+        403:
+          description: Forbidden - SuperAdmin only
+        500:
+          description: Server error
+
+  /users:
+    get:
+      tags:
+        - Users
+      summary: Get users
+      description: Retrieve users (filtered by campus for non-SuperAdmins)
+      security:
+        - jwt: []
+      responses:
+        200:
+          description: List of users
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/User'
+        500:
+          description: Server error
+
+  /notifications:
+    get:
+      tags:
+        - Notifications
+      summary: Get all notifications
+      description: Retrieve notifications with optional filters and pagination
+      security:
+        - jwt: []
+      parameters:
+        - in: query
+          name: type
+          type: string
+          enum: [Partnerships, System, Alerts]
+        - in: query
+          name: isRead
+          type: boolean
+        - in: query
+          name: limit
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+        - in: query
+          name: page
+          type: integer
+          minimum: 1
+          default: 1
+      responses:
+        200:
+          description: List of notifications
+          schema:
+            type: object
+            properties:
+              notifications:
+                type: array
+                items:
+                  $ref: '#/definitions/Notification'
+              pagination:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  pages:
+                    type: integer
+                  limit:
+                    type: integer
+        400:
+          description: Invalid query parameters
+        500:
+          description: Server error
+    post:
+      tags:
+        - Notifications
+      summary: Create a new notification
+      description: Create a new notification (admin/system-generated)
+      security:
+        - jwt: []
+      parameters:
+        - in: body
+          name: notification
+          description: Notification details
+          required: true
+          schema:
+            $ref: '#/definitions/Notification'
+      responses:
+        201:
+          description: Notification created
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+              notification:
+                $ref: '#/definitions/Notification'
+        400:
+          description: Validation error
+        500:
+          description: Server error
+
+  /notifications/unread:
+    get:
+      tags:
+        - Notifications
+      summary: Get unread notifications
+      description: Retrieve all unread notifications
+      security:
+        - jwt: []
+      responses:
+        200:
+          description: List of unread notifications
+          schema:
+            type: object
+            properties:
+              notifications:
+                type: array
+                items:
+                  $ref: '#/definitions/Notification'
+        500:
+          description: Server error
+
+  /notifications/{id}/read:
+    patch:
+      tags:
+        - Notifications
+      summary: Mark notification as read
+      description: Mark a single notification as read
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: id
+          type: string
+          required: true
+          description: Notification ID (MongoDB ObjectId)
+      responses:
+        200:
+          description: Notification marked as read
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+              notification:
+                $ref: '#/definitions/Notification'
+        404:
+          description: Notification not found
+        500:
+          description: Server error
+
+  /notifications/read-all:
+    patch:
+      tags:
+        - Notifications
+      summary: Mark all notifications as read
+      description: Mark all notifications as read for the user
+      security:
+        - jwt: []
+      responses:
+        200:
+          description: All notifications marked as read
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+        500:
+          description: Server error
+
+  /notifications/{id}:
+    delete:
+      tags:
+        - Notifications
+      summary: Delete a notification
+      description: Delete a notification by ID
+      security:
+        - jwt: []
+      parameters:
+        - in: path
+          name: id
+          type: string
+          required: true
+          description: Notification ID (MongoDB ObjectId)
+      responses:
+        200:
+          description: Notification deleted
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+        404:
+          description: Notification not found
+        500:
+          description: Server error
+
+  /notifications/settings:
+    get:
+      tags:
+        - Notifications
+      summary: Get notification settings
+      description: Get the current user's notification preferences (system, partnership, alerts)
+      security:
+        - jwt: []
+      responses:
+        200:
+          description: User notification settings
+          schema:
+            type: object
+            properties:
+              settings:
+                $ref: '#/definitions/NotificationSettings'
+        500:
+          description: Server error
+    post:
+      tags:
+        - Notifications
+      summary: Update notification settings
+      description: Update the current user's notification preferences
+      security:
+        - jwt: []
+      parameters:
+        - in: body
+          name: preferences
+          description: Notification preferences object
+          required: true
+          schema:
+            type: object
+            properties:
+              preferences:
+                type: object
+                properties:
+                  system:
+                    type: boolean
+                  partnership:
+                    type: boolean
+                  alerts:
+                    type: boolean
+      responses:
+        200:
+          description: Settings updated
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+              settings:
+                $ref: '#/definitions/NotificationSettings'
+        500:
+          description: Server error
+
+definitions:
+  User:
+    type: object
+    properties:
+      _id:
+        type: string
+      firstName:
+        type: string
+      lastName:
+        type: string
+      email:
+        type: string
+        format: email
+      role:
+        type: string
+        enum: ['SuperAdmin', 'Admin']
+      campusId:
+        type: string
+      status:
+        type: string
+        enum: ['pending', 'active', 'inactive']
+      createdAt:
+        type: string
+        format: date-time
+      updatedAt:
+        type: string
+        format: date-time
+    required:
+      - firstName
+      - lastName
+      - email
+      - role
+      - status
+
+  ContactPerson:
+    type: object
+    properties:
+      name:
+        type: string
+      title:
+        type: string
+      institutionalEmail:
+        type: string
+        format: email
+      phoneNumber:
+        type: string
+      address:
+        type: string
+    required:
+      - name
+      - title
+      - institutionalEmail
+      - phoneNumber
+      - address
+
+  AAUContactPerson:
+    type: object
+    properties:
+      name:
+        type: string
+      college:
+        type: string
+        enum:
+          - 'Central'
+          - 'College of Business and Economics'
+          - 'College of Social Science, Arts and Humanities'
+          - 'College of Veterinary Medicine and Agriculture'
+          - 'School of Law'
+          - 'College of Technology and Built Environment'
+          - 'College of Education and Language Studies'
+          - 'College of Health Science'
+      schoolDepartmentUnit:
+        type: string
+      institutionalEmail:
+        type: string
+        format: email
+      phoneNumber:
+        type: string
+    required:
+      - name
+      - college
+      - schoolDepartmentUnit
+      - institutionalEmail
+      - phoneNumber
+
+  Partnership:
+    type: object
+    properties:
+      partnerInstitution:
+        type: object
+        properties:
+          name:
+            type: string
+          address:
+            type: string
+          country:
+            type: string
+          typeOfOrganization:
+            type: string
+            enum: ['Academic', 'Research', 'NGO', 'INGO', 'Government', 'Private', 'Other']
+        required:
+          - name
+          - address
+          - country
+          - typeOfOrganization
+      aauContact:
+        type: object
+        properties:
+          interestedCollegeOrDepartment:
+            type: string
+        required:
+          - interestedCollegeOrDepartment
+      potentialAreasOfCollaboration:
+        type: array
+        items:
+          type: string
+          enum:
+            - 'Research/Technology Transfer'
+            - 'Student/Staff/Researcher Mobility'
+            - 'Funding Grant/Resource Mobilization'
+            - 'Joint Courses/Programs'
+            - 'University-Industry Linkage'
+            - 'Consultancy'
+            - 'Joint Training/Seminars/Workshops'
+            - 'Other'
+      otherCollaborationArea:
+        type: string
+      potentialStartDate:
+        type: string
+        format: date
+      durationOfPartnership:
+        type: string
+        enum: ['1 year', '2 years', '3 years', '4 years', '5 years']
+      partnerContactPerson:
+        $ref: '#/definitions/ContactPerson'
+      partnerContactPersonSecondary:
+        $ref: '#/definitions/ContactPerson'
+      aauContactPerson:
+        $ref: '#/definitions/AAUContactPerson'
+      aauContactPersonSecondary:
+        $ref: '#/definitions/AAUContactPerson'
+      status:
+        type: string
+        enum: ['Pending', 'Active', 'Rejected']
+        default: 'Pending'
+      campusId:
+        type: string
+      createdBy:
+        type: string
+      isArchived:
+        type: boolean
+        default: false
+      mouFileUrl:
+        type: string
+      createdAt:
+        type: string
+        format: date-time
+      updatedAt:
+        type: string
+        format: date-time
+    required:
+      - partnerInstitution
+      - aauContact
+      - potentialAreasOfCollaboration
+      - potentialStartDate
+      - durationOfPartnership
+      - partnerContactPerson
+      - aauContactPerson
+      - campusId
+      - createdBy
+
+  Notification:
+    type: object
+    properties:
+      id:
+        type: string
+        description: Unique notification ID
+      title:
+        type: string
+        description: Notification title
+      message:
+        type: string
+        description: Notification message
+      type:
+        type: string
+        enum: [Partnerships, System, Alerts]
+        description: Notification type
+      isRead:
+        type: boolean
+        description: Read status
+      timestamp:
+        type: string
+        format: date-time
+        description: ISO timestamp
+      userId:
+        type: string
+        description: User ID (if user-specific)
+    required:
+      - title
+      - message
+      - type
+      - isRead
+      - timestamp
+
+  NotificationSettings:
+    type: object
+    properties:
+      userId:
+        type: string
+      preferences:
+        type: object
+        properties:
+          system:
+            type: boolean
+          partnership:
+            type: boolean
+          alerts:
+            type: boolean
+    required:
+      - userId
+      - preferences
