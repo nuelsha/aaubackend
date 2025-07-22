@@ -31,11 +31,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(
   cors({
-    origin: "'https://aaufrontend-v2.vercel.app'",
+    origin: ["http://localhost:5173", "https://aaufrontend-v2.vercel.app"],
     credentials: true,
   })
 );
-
 
 // Swagger UI
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
